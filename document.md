@@ -1717,3 +1717,723 @@ fix(hotel-booking): ...
 ```
 
 Nội dung commit viết bằng tiếng Việt.
+# 43. Hỗ trợ chọn nhiều phòng trong cùng một booking
+
+Plugin phải hỗ trợ người dùng chọn và đặt **nhiều phòng trong cùng một lần booking**.
+
+Ví dụ khách có thể chọn:
+
+```text
+Sweet Heart
+20/08/2026
+08:00 - 10:50
+
++
+
+Ball
+20/08/2026
+11:40 - 14:30
+
++
+
+Blue Sea
+21/08/2026
+08:40 - 11:30
+```
+
+Sau đó bấm:
+
+```text
+Đặt phòng
+```
+
+và tạo **một Order duy nhất** chứa nhiều Order Detail.
+
+Kiến trúc phải bám đúng model KiotViet:
+
+```text
+Order
+  ↓
+Order Details[]
+```
+
+Không tạo một Order riêng cho mỗi phòng nếu người dùng đang thực hiện cùng một lần đặt.
+
+---
+
+## 43.1. Frontend multi-select
+
+Calendar phải cho phép chọn nhiều slot/phòng.
+
+Ví dụ:
+
+```text
+Sweet Heart   08:00 - 10:50   [SELECTED]
+
+Ball          11:40 - 14:30   [SELECTED]
+
+Blue Sea      15:20 - 18:10   [SELECTED]
+```
+
+Trạng thái:
+
+```text
+SELECTED
+```
+
+chỉ tồn tại phía frontend/session.
+
+Không lưu `SELECTED` vào database.
+
+Người dùng có thể:
+
+```text
+click một ô
+→ thêm vào danh sách chọn
+
+click lại ô đã chọn
+→ bỏ khỏi danh sách
+```
+
+---
+
+## 43.2. Booking Cart / Selected Rooms
+
+Phía dưới calendar cần có khu vực tóm tắt các phòng đã chọn.
+
+Ví dụ:
+
+```text
+ĐÃ CHỌN 3 PHÒNG
+
+1. Sweet Heart
+20/08/2026
+08:00 - 10:50
+250.000đ
+
+2. Ball
+20/08/2026
+11:40 - 14:30
+300.000đ
+
+3. Blue Sea
+21/08/2026
+08:40 - 11:30
+400.000đ
+
+------------------------
+
+Tạm tính:
+950.000đ
+
+Giảm giá:
+100.000đ
+
+Tổng:
+850.000đ
+
+[ĐẶT PHÒNG]
+```
+
+Người dùng phải có thể:
+
+```text
+xóa từng phòng
+xóa toàn bộ lựa chọn
+thay đổi lựa chọn trước khi đặt
+```
+
+---
+
+## 43.3. Không bắt buộc cùng ngày hoặc cùng khung giờ
+
+Hệ thống phải hỗ trợ nhiều trường hợp:
+
+### Trường hợp 1
+
+Nhiều phòng cùng giờ:
+
+```text
+Sweet Heart
+20/08
+08:00 - 10:50
+
+Ball
+20/08
+08:20 - 11:10
+```
+
+### Trường hợp 2
+
+Nhiều phòng khác giờ:
+
+```text
+Sweet Heart
+08:00 - 10:50
+
+Ball
+15:00 - 17:50
+```
+
+### Trường hợp 3
+
+Nhiều phòng khác ngày:
+
+```text
+Sweet Heart
+20/08
+
+Ball
+21/08
+
+Blue Sea
+22/08
+```
+
+Không được hard-code điều kiện tất cả room detail phải cùng:
+
+```text
+date
+checkInTime
+checkOutTime
+```
+
+Mỗi phòng/detail có thời gian riêng.
+
+---
+
+# 44. Mapping theo KiotViet
+
+KiotViet đã có cấu trúc:
+
+```text
+roomClasses: [
+    {
+        id
+        quantity
+        price
+        note
+        version
+    }
+]
+```
+
+Do đó request/domain model phải giữ khả năng gửi nhiều hạng phòng trong:
+
+```text
+roomClasses[]
+```
+
+Không đổi tên field.
+
+Ví dụ:
+
+```text
+roomClasses: [
+    {
+        id: 120841,
+        quantity: 2,
+        price: 250000,
+        note: "",
+        version: 3
+    },
+    {
+        id: 120842,
+        quantity: 1,
+        price: 350000,
+        note: "",
+        version: 2
+    }
+]
+```
+
+Điều này phải được giữ nguyên trong KiotViet-compatible layer.
+
+---
+
+# 45. Một Order – nhiều Order Detail
+
+Khi tạo booking:
+
+```text
+Order
+```
+
+là thông tin chung:
+
+```text
+uuid
+customerId
+branchId
+status
+adultQuantity
+childQuantity
+discount
+total
+totalPayment
+...
+```
+
+Còn từng phòng được lưu thành:
+
+```text
+Order Detail
+```
+
+Ví dụ:
+
+```text
+Order DP000001
+│
+├── Order Detail #1
+│   roomId = 101
+│   checkInTime = ...
+│   checkOutTime = ...
+│   price = ...
+│
+├── Order Detail #2
+│   roomId = 205
+│   checkInTime = ...
+│   checkOutTime = ...
+│   price = ...
+│
+└── Order Detail #3
+    roomId = 302
+    checkInTime = ...
+    checkOutTime = ...
+    price = ...
+```
+
+Không duplicate customer/order header cho từng phòng.
+
+---
+
+# 46. Giá của nhiều phòng
+
+Backend phải tính giá riêng từng selection.
+
+Ví dụ:
+
+```text
+Detail 1
+basePrice = 300000
+discount = 50000
+subTotal = 250000
+
+Detail 2
+basePrice = 400000
+discount = 0
+subTotal = 400000
+```
+
+Sau đó Order tổng hợp:
+
+```text
+subTotal
+discount
+discountValue
+surcharge
+total
+totalPayment
+```
+
+Frontend không được tự gửi giá cuối cùng rồi backend tin luôn.
+
+Backend phải resolve lại:
+
+```text
+room
++
+time
++
+price rule
++
+promotion
+```
+
+cho từng phòng.
+
+---
+
+# 47. Promotion khi chọn nhiều phòng
+
+Khuyến mại phải được tính riêng từng phòng/slot trước.
+
+Ví dụ:
+
+```text
+Sweet Heart
+300.000
+promotion 20%
+→ 240.000
+
+Ball
+400.000
+không promotion
+→ 400.000
+```
+
+Sau đó:
+
+```text
+Order subtotal
+=
+240.000 + 400.000
+```
+
+Nếu sau này có promotion cấp Order thì phải tách rõ:
+
+```text
+Detail discount
+```
+
+và:
+
+```text
+Order discount
+```
+
+Không nhập nhằng hai loại.
+
+---
+
+# 48. Validate availability cho toàn bộ selection
+
+Khi khách bấm:
+
+```text
+ĐẶT PHÒNG
+```
+
+backend phải check lại **tất cả phòng đã chọn**.
+
+Ví dụ selection có:
+
+```text
+Room A
+Room B
+Room C
+```
+
+Backend phải:
+
+```text
+check Room A
+check Room B
+check Room C
+```
+
+Nếu một phòng vừa bị người khác đặt:
+
+```text
+Room A = available
+Room B = conflict
+Room C = available
+```
+
+thì không được âm thầm tạo booking thiếu Room B.
+
+Mặc định xử lý atomic:
+
+```text
+ALL PASS
+→ tạo toàn bộ booking
+
+ANY FAIL
+→ reject toàn bộ booking
+```
+
+và trả cho frontend biết chính xác room/slot nào không còn khả dụng.
+
+Không tạo booking một phần trừ khi sau này có yêu cầu riêng.
+
+---
+
+# 49. Transaction
+
+Việc tạo:
+
+```text
+1 Order
++
+N Order Details
+```
+
+phải được xem là một transaction logic.
+
+Luồng:
+
+```text
+BEGIN
+
+check availability tất cả selections
+
+↓ pass
+
+create Order
+
+↓
+create Detail 1
+create Detail 2
+create Detail 3
+...
+
+↓
+update total nếu cần
+
+COMMIT
+```
+
+Nếu bất kỳ bước nào lỗi:
+
+```text
+ROLLBACK
+```
+
+Không được để trạng thái:
+
+```text
+Order đã tạo
+
+nhưng mới có 1/3 phòng
+```
+
+---
+
+# 50. Race condition khi đặt nhiều phòng
+
+Phải xử lý:
+
+```text
+User A:
+chọn Room 101 + Room 102
+
+User B:
+chọn Room 102
+```
+
+Cả hai cùng đặt.
+
+Backend phải đảm bảo chỉ một booking giữ được Room 102.
+
+Không dựa vào availability đã tải từ frontend vài giây trước.
+
+Phải kiểm tra lại trong quá trình create booking.
+
+---
+
+# 51. Không chọn trùng cùng một phòng/slot
+
+Trong selection frontend không cho phép duplicate:
+
+```text
+roomId = 101
+checkInTime = 08:00
+checkOutTime = 10:50
+```
+
+xuất hiện hai lần.
+
+Backend cũng phải validate lại.
+
+Không tin frontend.
+
+---
+
+# 52. Quantity
+
+Nếu user đặt nhiều phòng cùng một hạng phòng:
+
+```text
+Sweet Heart
+Room 101
+
+Sweet Heart
+Room 102
+```
+
+thì KiotViet-compatible `roomClasses` có thể tổng hợp:
+
+```text
+id = Sweet Heart room class id
+quantity = 2
+```
+
+Nhưng trong Order Detail vẫn phải giữ từng phòng cụ thể nếu `roomId` đã được assign:
+
+```text
+Detail #1
+roomId = 101
+
+Detail #2
+roomId = 102
+```
+
+Không làm mất thông tin phòng vật lý.
+
+---
+
+# 53. UI nút Đặt phòng
+
+Nút ở cuối calendar phải hiển thị số lượng selection.
+
+Ví dụ:
+
+```text
+Đặt phòng (1)
+```
+
+```text
+Đặt phòng (3)
+```
+
+Nếu chưa chọn:
+
+```text
+Đặt phòng (0)
+```
+
+thì disable.
+
+Có thể đồng thời hiển thị:
+
+```text
+3 phòng
+Tổng tạm tính: 850.000đ
+```
+
+---
+
+# 54. Sang trang đặt phòng
+
+Khi bấm:
+
+```text
+Đặt phòng (3)
+```
+
+không redirect vào duy nhất một room detail rồi làm mất các room khác.
+
+Nếu chỉ chọn 1 phòng:
+
+```text
+→ có thể sang /phong/{slug}/
+```
+
+Nếu chọn nhiều phòng:
+
+```text
+→ sang trang xác nhận booking /dat-phong/xac-nhan/
+```
+
+Trang xác nhận hiển thị toàn bộ selection:
+
+```text
+PHÒNG ĐÃ CHỌN
+
+1. Sweet Heart
+...
+
+2. Ball
+...
+
+3. Blue Sea
+...
+
+THÔNG TIN KHÁCH HÀNG
+
+Tên
+SĐT
+Email
+Người lớn
+Trẻ em
+Ghi chú
+
+TỔNG TIỀN
+
+[HOÀN TẤT ĐẶT PHÒNG]
+```
+
+Không được làm mất booking context.
+
+---
+
+# 55. Session / temporary state
+
+Selection chưa phải booking thật.
+
+Có thể lưu tạm bằng:
+
+```text
+frontend state
+session phù hợp
+signed payload
+WordPress transient nếu thực sự phù hợp
+```
+
+Không được tạo Order ngay khi user chỉ click chọn phòng.
+
+Order chỉ được tạo khi user xác nhận cuối cùng.
+
+Không lưu selection vĩnh viễn vào database nếu chưa cần.
+
+---
+
+# 56. Verify multi-room bắt buộc
+
+Phải test:
+
+```text
+1 phòng
+→ booking thành công
+→ 1 Order
+→ 1 Order Detail
+```
+
+```text
+3 phòng
+→ booking thành công
+→ 1 Order
+→ 3 Order Details
+```
+
+```text
+3 phòng
+1 phòng conflict
+
+→ 0 Order mới
+→ 0 partial detail
+→ báo phòng conflict
+```
+
+```text
+2 phòng cùng room class
+
+→ roomClasses quantity đúng
+→ mỗi roomId vẫn có detail riêng
+```
+
+```text
+nhiều phòng khác ngày/khác giờ
+
+→ lưu đúng checkInTime/checkOutTime từng detail
+```
+
+```text
+nhiều phòng có promotion khác nhau
+
+→ từng detail tính đúng
+→ Order total đúng
+```
+
+Sau khi hoàn thành phải báo rõ:
+
+```text
+Multi-room booking supported: YES
+
+1 Order -> N Order Details: YES
+
+Atomic booking creation: YES
+
+Partial booking on conflict: NO
+```
